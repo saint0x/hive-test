@@ -161,4 +161,22 @@ slidesRouter.get('/presentations/:id/slides/:pageId', async (c) => {
   }
 });
 
+slidesRouter.post('/presentations/:id/generate-batch', async (c) => {
+  const auth = c.get('auth');
+  const { id } = c.req.param();
+  const { sheetId, sheetRange, count } = await c.req.json();
+
+  if (!sheetId || !sheetRange || !count) {
+    return c.json({ error: 'Missing required parameters' }, 400);
+  }
+
+  try {
+    const newConnections = await generateBatchSlides(auth, id, sheetId, sheetRange, count);
+    return c.json({ message: 'Batch slides generated successfully', connections: newConnections });
+  } catch (error) {
+    console.error(`Error generating batch slides for presentation ${id}:`, error);
+    return c.json({ error: 'Failed to generate batch slides', details: error.message }, 500);
+  }
+});
+
 module.exports = slidesRouter;

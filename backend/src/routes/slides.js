@@ -1,5 +1,6 @@
 const { Hono } = require('hono');
 const { google } = require('googleapis');
+const slidesApi = require('../api/slides');
 
 const slidesRouter = new Hono();
 
@@ -158,6 +159,24 @@ slidesRouter.get('/presentations/:id/slides/:pageId', async (c) => {
   } catch (error) {
     console.error(`Error fetching slide content for presentation ${id}, page ${pageId}:`, error);
     return c.json({ error: 'Failed to fetch slide content', details: error.message }, 500);
+  }
+});
+
+// Add this new route to the existing file
+slidesRouter.post('/slides/generate-batch', async (c) => {
+  const auth = c.get('auth');
+  const { presentationId, spreadsheetId, range, count } = await c.req.json();
+
+  if (!presentationId || !spreadsheetId || !range) {
+    return c.json({ error: 'Missing required parameters' }, 400);
+  }
+
+  try {
+    const newSlideIds = await slidesApi.generateBatchSlides(auth, presentationId, spreadsheetId, range, count);
+    return c.json({ message: 'Batch slides generated successfully', slideIds: newSlideIds });
+  } catch (error) {
+    console.error(`Error generating batch slides:`, error);
+    return c.json({ error: error.message || 'Failed to generate batch slides' }, 500);
   }
 });
 

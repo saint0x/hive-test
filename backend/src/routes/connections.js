@@ -42,4 +42,21 @@ connectionsRouter.post('/connections/sync', async (c) => {
   }
 });
 
+connectionsRouter.post('/connections/reorder', async (c) => {
+  const auth = c.get('auth');
+  const { connectionIds } = await c.req.json();
+
+  if (!connectionIds || !Array.isArray(connectionIds)) {
+    return c.json({ error: 'Invalid connectionIds provided' }, 400);
+  }
+
+  try {
+    const reorderedConnections = await connectionsApi.reorderConnections(auth, connectionIds);
+    return c.json({ message: 'Connections reordered successfully', connections: reorderedConnections });
+  } catch (error) {
+    console.error('Error reordering connections:', error);
+    return c.json({ error: 'Failed to reorder connections', details: error.message }, 500);
+  }
+});
+
 module.exports = connectionsRouter;

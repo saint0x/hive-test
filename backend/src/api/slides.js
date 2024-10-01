@@ -198,11 +198,95 @@ async function verifyPresentation(auth, presentationId) {
   }
 }
 
+// Add this function to the existing file
+async function generateBatchSlides(auth, presentationId, spreadsheetId, range, count = 5) {
+  const slides = google.slides({ version: 'v1', auth });
+  const sheets = google.sheets({ version: 'v4', auth });
+
+  try {
+    // Ensure the range is correctly formatted
+    const formattedRange = range.includes(':') ? range : range.replace('-', ':');
+
+    // Fetch data from sheets
+    const sheetData = await sheets.spreadsheets.values.get({
+      spreadsheetId: spreadsheetId,
+      range: formattedRange,
+    });
+
+    const values = sheetData.data.values;
+    if (!values || values.length === 0) {
+      throw new Error('No data found in the specified range');
+    }
+
+    const requests = [];
+    const newSlideIds = [];
+
+    for (let i = 0; i < Math.min(count, values.length); i++) {
+      const rowData = values[i];
+      
+      // Create a new slide without specifying an ID
+      requests.push({
+        createSlide: {
+          insertionIndex: i,
+          slideLayoutReference: { predefinedLayout: 'BLANK' }
+        }
+      });
+
+      // Add text boxes for each cell in the row
+      rowData.forEach((cellValue, cellIndex) => {
+        requests.push({
+          createShape: {
+            shapeType: 'TEXT_BOX',
+            elementProperties: {
+              pageObjectId: '${pageId}', // This will be replaced with the actual page ID
+              size: { width: { magnitude: 300, unit: 'PT' }, height: { magnitude: 50, unit: 'PT' } },
+              transform: { scaleX: 1, scaleY: 1, translateX: 50 + (cellIndex * 320), translateY: 50, unit: 'PT' }
+            }
+          }
+        });
+      });
+    }
+
+    // Execute the requests to create slides and text boxes
+    const response = await slides.presentations.batchUpdate({
+      presentationId: presentationId,
+      requestBody: { requests }
+    });
+
+    // Extract the new slide IDs and update the text content
+    const createdSlides = response.data.replies.filter(reply => reply.createSlide);
+    for (let i = 0; i < createdSlides.length; i++) {
+      const newSlideId = createdSlides[i].createSlide.objectId;
+      newSlideIds.push(newSlideId);
+
+      const rowData = values[i];
+      const textUpdateRequests = rowData.map((cellValue, cellIndex) => ({
+        insertText: {
+          objectId: response.data.replies[i * (rowData.length + 1) + cellIndex + 1].createShape.objectId,
+          text: cellValue
+        }
+      }));
+
+      await slides.presentations.batchUpdate({
+        presentationId: presentationId,
+        requestBody: { requests: textUpdateRequests }
+      });
+    }
+
+    return newSlideIds;
+  } catch (error) {
+    console.error('Error generating batch slides:', error);
+    throw new Error(`Failed to generate batch slides: ${error.message}`);
+  }
+}
+
+// Add this to the module.exports
 module.exports = {
   createPlaceholder,
   updateSlideText,
   updateSlideImage,
   updatePlaceholder,
   getSlidePageId,
-  verifyPresentation
+  verifyPresentation,
+  generateBatchSlides
 };

@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { useSearchParams } from 'next/navigation'
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import DraggableList from '@/components/DraggableList'
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001'
 
@@ -24,6 +25,16 @@ interface User {
   name: string
 }
 
+interface Connection {
+  id: string;
+  sheetId: string;
+  slideId: string;
+  sheetRange: string;
+  slidePageId: string;
+  slideElementId: string;
+  // Add any other properties that might be needed
+}
+
 export default function HomeContent() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [user, setUser] = useState<User | null>(null)
@@ -35,6 +46,7 @@ export default function HomeContent() {
   const [slidePageId, setSlidePageId] = useState('')
   const [selectedBlocks, setSelectedBlocks] = useState<number[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [connections, setConnections] = useState<Connection[]>([])
 
   const searchParams = useSearchParams()
 
@@ -63,9 +75,11 @@ export default function HomeContent() {
   }, [checkAuthStatus])
 
   useEffect(() => {
-    const errorParam = searchParams.get('error')
-    if (errorParam) {
-      setError(errorParam === 'auth_failed' ? 'Authentication failed. Please try again.' : errorParam)
+    if (searchParams) {
+      const errorParam = searchParams.get('error')
+      if (errorParam) {
+        setError(errorParam === 'auth_failed' ? 'Authentication failed. Please try again.' : errorParam)
+      }
     }
   }, [searchParams])
 
@@ -143,20 +157,21 @@ export default function HomeContent() {
           blocks: selectedBlocks,
           isImage: false
         }),
-      })
+      });
 
       if (response.ok) {
-        const data = await response.json()
-        console.log('Connection created successfully:', data)
+        const newConnection: Connection = await response.json();
+        setConnections(prevConnections => [...prevConnections, newConnection]);
+        console.log('Connection created successfully:', newConnection);
       } else if (response.status === 401) {
-        setIsAuthenticated(false)
-        setError('Authentication expired. Please log in again.')
+        setIsAuthenticated(false);
+        setError('Authentication expired. Please log in again.');
       } else {
-        throw new Error('Connection failed')
+        throw new Error('Connection failed');
       }
     } catch (error) {
-      console.error('Connection error:', error)
-      setError('Failed to create connection')
+      console.error('Connection error:', error);
+      setError('Failed to create connection');
     }
   }
 
@@ -167,6 +182,77 @@ export default function HomeContent() {
         : [...prev, blockId]
     )
   }
+
+  const generateBatchSlides = async () => {
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/slides/presentations/${selectedPresentation}/generate-batch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          sheetId: selectedSpreadsheet,
+          sheetRange,
+          count: 5 // You can make this configurable
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Batch slides generated successfully:', data);
+        // Update UI to reflect new slides
+      } else if (response.status === 401) {
+        setIsAuthenticated(false);
+        setError('Authentication expired. Please log in again.');
+      } else {
+        throw new Error('Failed to generate batch slides');
+      }
+    } catch (error) {
+      console.error('Error generating batch slides:', error);
+      setError('Failed to generate batch slides');
+    }
+  };
+
+  const reorderConnections = async (connectionIds: string[]) => {
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/connections/reorder`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ connectionIds }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Connections reordered successfully:', data);
+        // Update UI to reflect new order
+      } else if (response.status === 401) {
+        setIsAuthenticated(false);
+        setError('Authentication expired. Please log in again.');
+      } else {
+        throw new Error('Failed to reorder connections');
+      }
+    } catch (error) {
+      console.error('Error reordering connections:', error);
+      setError('Failed to reorder connections');
+    }
+  };
+
+  const fetchConnections = async () => {
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/connections`, {
+        credentials: 'include'
+      });
+      if (response.ok) {
+        const data: Connection[] = await response.json();
+        setConnections(data);
+      } else {
+        throw new Error('Failed to fetch connections');
+      }
+    } catch (error) {
+      console.error('Error fetching connections:', error);
+      setError('Failed to fetch connections');
+    }
+  };
 
   return (
     <div className="container mx-auto p-4 bg-white min-h-screen">
@@ -279,6 +365,18 @@ export default function HomeContent() {
           </CardContent>
         </Card>
       </div>
+      <Button onClick={generateBatchSlides} className="mt-4">
+        Generate 5 Slides
+      </Button>
+
+      {/* Add a draggable list of connections for reordering */}
+      <DraggableList
+        items={connections}
+        onReorder={(newOrder: Connection[]) => {
+          setConnections(newOrder);
+          reorderConnections(newOrder.map(conn => conn.id));
+        }}
+      />
     </div>
   )
 }
