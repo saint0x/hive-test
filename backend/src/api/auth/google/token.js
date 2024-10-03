@@ -1,8 +1,8 @@
 const { google } = require('googleapis');
 
 const oauth2Client = new google.auth.OAuth2(
-  '123456789-abcdefghijklmnopqrstuvwxyz.apps.googleusercontent.com',
-  'GOCSPX-abcdefghijklmnopqrstuvwxyz',
+  '1027395944679-049n69bno5mi3127jco9vj1l4ingv34s.apps.googleusercontent.com',
+  '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',
   'http://localhost:3000/api/auth/callback/google'
 );
 

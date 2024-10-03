@@ -1,382 +1,136 @@
 'use client'
 
-import React, { useState, useEffect, useCallback } from 'react'
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { useSearchParams } from 'next/navigation'
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import DraggableList from '@/components/DraggableList'
-
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001'
+import React, { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 
 interface File {
-  id: string
-  name: string
-  mimeType: string
-  thumbnailLink?: string
-}
-
-interface User {
-  email: string
-  name: string
-}
-
-interface Connection {
   id: string;
-  sheetId: string;
-  slideId: string;
-  sheetRange: string;
-  slidePageId: string;
-  slideElementId: string;
-  // Add any other properties that might be needed
+  name: string;
+}
+
+interface Files {
+  spreadsheets: File[];
+  presentations: File[];
 }
 
 export default function HomeContent() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [user, setUser] = useState<User | null>(null)
-  const [spreadsheets, setSpreadsheets] = useState<File[]>([])
-  const [presentations, setPresentations] = useState<File[]>([])
-  const [selectedSpreadsheet, setSelectedSpreadsheet] = useState('')
-  const [selectedPresentation, setSelectedPresentation] = useState('')
-  const [sheetRange, setSheetRange] = useState('')
-  const [slidePageId, setSlidePageId] = useState('')
-  const [selectedBlocks, setSelectedBlocks] = useState<number[]>([])
-  const [error, setError] = useState<string | null>(null)
-  const [connections, setConnections] = useState<Connection[]>([])
-
-  const searchParams = useSearchParams()
-
-  const checkAuthStatus = useCallback(async () => {
-    try {
-      const response = await fetch(`${BACKEND_URL}/api/auth/check`, {
-        credentials: 'include'
-      })
-      if (response.ok) {
-        const data = await response.json()
-        setIsAuthenticated(data.isAuthenticated)
-        setUser(data.user)
-        if (data.isAuthenticated) {
-          fetchSpreadsheets()
-          fetchPresentations()
-        }
-      }
-    } catch (error) {
-      console.error('Error checking auth status:', error)
-      setError('Failed to check authentication status')
-    }
-  }, [])
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [files, setFiles] = useState<Files>({ spreadsheets: [], presentations: [] });
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    checkAuthStatus()
-  }, [checkAuthStatus])
-
-  useEffect(() => {
-    if (searchParams) {
-      const errorParam = searchParams.get('error')
-      if (errorParam) {
-        setError(errorParam === 'auth_failed' ? 'Authentication failed. Please try again.' : errorParam)
-      }
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('auth') === 'success') {
+      setIsAuthenticated(true);
+      fetchFiles();
+    } else {
+      checkAuthStatus();
     }
-  }, [searchParams])
+  }, []);
 
-  const handleAuth = async () => {
+  const checkAuthStatus = async () => {
     try {
-      const response = await fetch('/api/auth/google/url')
-      const data = await response.json()
-      if (data.url) {
-        window.location.href = data.url
-      }
-    } catch (error) {
-      console.error('Error getting auth URL:', error)
-      setError('Failed to initiate authentication')
-    }
-  }
-
-  const fetchSpreadsheets = async () => {
-    try {
-      const response = await fetch(`${BACKEND_URL}/api/spreadsheets`, {
+      const response = await fetch('/api/google/files', {
         credentials: 'include'
-      })
-      if (response.ok) {
-        const data = await response.json()
-        setSpreadsheets(data)
-      } else if (response.status === 401) {
-        setIsAuthenticated(false)
-        setError('Authentication expired. Please log in again.')
-      } else {
-        throw new Error('Failed to fetch spreadsheets')
-      }
-    } catch (error) {
-      console.error('Error fetching spreadsheets:', error)
-      setError('Failed to fetch spreadsheets')
-    }
-  }
-
-  const fetchPresentations = async () => {
-    try {
-      const response = await fetch(`${BACKEND_URL}/api/presentations`, {
-        credentials: 'include'
-      })
-      if (response.ok) {
-        const data = await response.json()
-        setPresentations(data)
-      } else if (response.status === 401) {
-        setIsAuthenticated(false)
-        setError('Authentication expired. Please log in again.')
-      } else {
-        throw new Error('Failed to fetch presentations')
-      }
-    } catch (error) {
-      console.error('Error fetching presentations:', error)
-      setError('Failed to fetch presentations')
-    }
-  }
-
-  const handleConnect = async () => {
-    if (!isAuthenticated) {
-      handleAuth()
-      return
-    }
-
-    try {
-      const response = await fetch(`${BACKEND_URL}/api/connections`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          sheetId: selectedSpreadsheet,
-          slideId: selectedPresentation,
-          sheetRange,
-          slidePageId,
-          blocks: selectedBlocks,
-          isImage: false
-        }),
       });
-
+      
       if (response.ok) {
-        const newConnection: Connection = await response.json();
-        setConnections(prevConnections => [...prevConnections, newConnection]);
-        console.log('Connection created successfully:', newConnection);
+        setIsAuthenticated(true);
+        const data: Files = await response.json();
+        setFiles(data);
       } else if (response.status === 401) {
         setIsAuthenticated(false);
-        setError('Authentication expired. Please log in again.');
+        // Redirect to login if authentication has expired
+        window.location.href = '/api/auth/google/url';
       } else {
-        throw new Error('Connection failed');
+        throw new Error('Failed to check auth status');
       }
     } catch (error) {
-      console.error('Connection error:', error);
-      setError('Failed to create connection');
-    }
-  }
-
-  const toggleBlockSelection = (blockId: number) => {
-    setSelectedBlocks(prev => 
-      prev.includes(blockId) 
-        ? prev.filter(id => id !== blockId)
-        : [...prev, blockId]
-    )
-  }
-
-  const generateBatchSlides = async () => {
-    try {
-      const response = await fetch(`${BACKEND_URL}/api/slides/presentations/${selectedPresentation}/generate-batch`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          sheetId: selectedSpreadsheet,
-          sheetRange,
-          count: 5 // You can make this configurable
-        }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        console.log('Batch slides generated successfully:', data);
-        // Update UI to reflect new slides
-      } else if (response.status === 401) {
-        setIsAuthenticated(false);
-        setError('Authentication expired. Please log in again.');
-      } else {
-        throw new Error('Failed to generate batch slides');
-      }
-    } catch (error) {
-      console.error('Error generating batch slides:', error);
-      setError('Failed to generate batch slides');
+      console.error('Error checking auth status:', error);
+      setError('Failed to check authentication status');
     }
   };
 
-  const reorderConnections = async (connectionIds: string[]) => {
+  const fetchFiles = async () => {
     try {
-      const response = await fetch(`${BACKEND_URL}/api/connections/reorder`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ connectionIds }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        console.log('Connections reordered successfully:', data);
-        // Update UI to reflect new order
-      } else if (response.status === 401) {
-        setIsAuthenticated(false);
-        setError('Authentication expired. Please log in again.');
-      } else {
-        throw new Error('Failed to reorder connections');
-      }
-    } catch (error) {
-      console.error('Error reordering connections:', error);
-      setError('Failed to reorder connections');
-    }
-  };
-
-  const fetchConnections = async () => {
-    try {
-      const response = await fetch(`${BACKEND_URL}/api/connections`, {
+      const response = await fetch('/api/google/files', {
         credentials: 'include'
       });
+      
       if (response.ok) {
-        const data: Connection[] = await response.json();
-        setConnections(data);
+        const data: Files = await response.json();
+        setFiles(data);
       } else {
-        throw new Error('Failed to fetch connections');
+        throw new Error('Failed to fetch files');
       }
     } catch (error) {
-      console.error('Error fetching connections:', error);
-      setError('Failed to fetch connections');
+      console.error('Error fetching files:', error);
+      setError('Failed to fetch files');
     }
   };
+
+  const handleLogin = async () => {
+    try {
+      const response = await fetch('/api/auth/google/url');
+      const { url } = await response.json();
+      window.location.href = url;
+    } catch (error) {
+      console.error('Error getting auth URL:', error);
+      setError('Failed to initiate login');
+    }
+  };
+
+  if (error) {
+    return <div>Error: {error}</div>;
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div>
+        <h1>Welcome to Google Drive Integration</h1>
+        <Button onClick={handleLogin}>Login with Google</Button>
+      </div>
+    );
+  }
 
   return (
-    <div className="container mx-auto p-4 bg-white min-h-screen">
-      <h1 className="text-3xl font-bold mb-8 text-center text-black">Hive Theory</h1>
-      {error && (
-        <Alert variant="destructive" className="mb-4">
-          <AlertTitle>Error</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
-      <div className="flex justify-center mb-8 space-x-4">
-        <Button 
-          onClick={handleAuth}
-          className="bg-green-500 text-white hover:bg-green-600 focus:ring-2 focus:ring-green-500"
-        >
-          {isAuthenticated ? 'Reauthenticate with Google' : 'Authenticate with Google'}
-        </Button>
-        <Button 
-          onClick={handleConnect}
-          className="bg-white text-black border-2 border-black hover:bg-gray-100 focus:ring-2 focus:ring-black"
-          disabled={!isAuthenticated}
-        >
-          Connect
-        </Button>
-      </div>
-      {isAuthenticated && user && (
-        <div className="mb-4 text-center">
-          <p>Logged in as: {user.email}</p>
-        </div>
-      )}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        <Card className="border-2 border-black shadow-none">
-          <CardHeader>
-            <CardTitle className="text-black">Google Sheets</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid w-full items-center gap-4">
-              <Select onValueChange={setSelectedSpreadsheet}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a spreadsheet" />
-                </SelectTrigger>
-                <SelectContent>
-                  {spreadsheets.map((sheet) => (
-                    <SelectItem key={sheet.id} value={sheet.id}>{sheet.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <div className="flex flex-col space-y-1.5">
-                <Label htmlFor="sheet-range" className="text-black">Sheet Range</Label>
-                <Input 
-                  id="sheet-range" 
-                  placeholder="e.g., Sheet1!A1:B10" 
-                  value={sheetRange}
-                  onChange={(e) => setSheetRange(e.target.value)}
-                  className="border-2 border-black focus:ring-2 focus:ring-black"
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-2 border-black shadow-none">
-          <CardHeader>
-            <CardTitle className="text-black">Google Slides</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid w-full items-center gap-4">
-              <Select onValueChange={setSelectedPresentation}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a presentation" />
-                </SelectTrigger>
-                <SelectContent>
-                  {presentations.map((pres) => (
-                    <SelectItem key={pres.id} value={pres.id}>{pres.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <div className="flex flex-col space-y-1.5">
-                <Label htmlFor="slide-page-id" className="text-black">Slide Page ID</Label>
-                <Input 
-                  id="slide-page-id" 
-                  placeholder="Enter slide page ID" 
-                  value={slidePageId}
-                  onChange={(e) => setSlidePageId(e.target.value)}
-                  className="border-2 border-black focus:ring-2 focus:ring-black"
-                />
-              </div>
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Button variant="outline">Select Blocks</Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-[425px]">
-                  <DialogHeader>
-                    <DialogTitle>Select Blocks</DialogTitle>
-                  </DialogHeader>
-                  <div className="grid grid-cols-3 gap-4 py-4">
-                    {[...Array(9)].map((_, index) => (
-                      <Button
-                        key={index}
-                        variant="outline"
-                        className={`h-20 ${selectedBlocks.includes(index) ? 'bg-primary text-primary-foreground' : ''}`}
-                        onClick={() => toggleBlockSelection(index)}
-                      >
-                        {index + 1}
-                      </Button>
-                    ))}
-                  </div>
-                </DialogContent>
-              </Dialog>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-      <Button onClick={generateBatchSlides} className="mt-4">
-        Generate 5 Slides
-      </Button>
-
-      {/* Add a draggable list of connections for reordering */}
-      <DraggableList
-        items={connections}
-        onReorder={(newOrder: Connection[]) => {
-          setConnections(newOrder);
-          reorderConnections(newOrder.map(conn => conn.id));
-        }}
-      />
+    <div>
+      <h1>Your Google Drive Files</h1>
+      <h2>Spreadsheets</h2>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Name</TableHead>
+            <TableHead>ID</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {files.spreadsheets.map((file) => (
+            <TableRow key={file.id}>
+              <TableCell>{file.name}</TableCell>
+              <TableCell>{file.id}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+      <h2>Presentations</h2>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Name</TableHead>
+            <TableHead>ID</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {files.presentations.map((file) => (
+            <TableRow key={file.id}>
+              <TableCell>{file.name}</TableCell>
+              <TableCell>{file.id}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
     </div>
-  )
+  );
 }

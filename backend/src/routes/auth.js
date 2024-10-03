@@ -4,10 +4,9 @@ const { setCookie, getCookie } = require('hono/cookie');
 
 const authRouter = new Hono();
 
-// Hardcoded credentials (not recommended for production)
-const CLIENT_ID = '1027395944679-049n69bno5mi3127jco9vj1l4ingv34s.apps.googleusercontent.com';
-const CLIENT_SECRET = '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';
-const REDIRECT_URI = 'http://localhost:3000/api/auth/google/callback';
+const CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
+const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
+const REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI;
 
 const oauth2Client = new google.auth.OAuth2(CLIENT_ID, CLIENT_SECRET, REDIRECT_URI);
 

@@ -3,6 +3,7 @@ const { OAuth2Client } = require('google-auth-library');
 
 const drive = google.drive({ version: 'v3' });
 const sheets = google.sheets({ version: 'v4' });
+const slides = google.slides({ version: 'v1' });
 
 async function listFiles(auth, mimeType) {
   const res = await drive.files.list({
@@ -22,7 +23,7 @@ async function getFileMetadata(auth, fileId) {
   return res.data;
 }
 
-async function downloadSheet(auth, fileId, range) {
+async function getSpreadsheetData(auth, fileId, range) {
   const res = await sheets.spreadsheets.values.get({
     auth,
     spreadsheetId: fileId,
@@ -31,18 +32,17 @@ async function downloadSheet(auth, fileId, range) {
   return res.data.values || [];
 }
 
-async function exportSlides(auth, fileId) {
-  const res = await drive.files.export({
+async function getPresentationData(auth, fileId) {
+  const res = await slides.presentations.get({
     auth,
-    fileId,
-    mimeType: 'application/pdf',
-  }, { responseType: 'arraybuffer' });
+    presentationId: fileId,
+  });
   return res.data;
 }
 
 module.exports = {
   listFiles,
   getFileMetadata,
-  downloadSheet,
-  exportSlides
+  getSpreadsheetData,
+  getPresentationData
 };

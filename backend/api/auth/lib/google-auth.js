@@ -1,8 +1,8 @@
 const { google } = require('googleapis');
 const { OAuth2Client } = require('google-auth-library');
 
-const GOOGLE_CLIENT_ID = '123456789-abcdefghijklmnopqrstuvwxyz.apps.googleusercontent.com';
-const GOOGLE_CLIENT_SECRET = 'GOCSPX-abcdefghijklmnopqrstuvwxyz';
+const GOOGLE_CLIENT_ID = '1027395944679-049n69bno5mi3127jco9vj1l4ingv34s.apps.googleusercontent.com';
+const GOOGLE_CLIENT_SECRET = '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';
 const GOOGLE_REDIRECT_URI = 'http://localhost:3000/api/auth/callback/google';
 
 if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET || !GOOGLE_REDIRECT_URI) {

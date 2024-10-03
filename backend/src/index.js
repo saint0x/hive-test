@@ -1,77 +1,50 @@
-const { serve } = require('@hono/node-server');
+require('dotenv').config({ path: '.env.local' });
 const { Hono } = require('hono');
-const { logger } = require('hono/logger');
-const { prettyJSON } = require('hono/pretty-json');
-const { google } = require('googleapis');
-const authRouter = require('./routes/auth');
+const { serve } = require('@hono/node-server');
+const { cors } = require('hono/cors');
 const sheetsRouter = require('./routes/sheets');
 const slidesRouter = require('./routes/slides');
+const authRouter = require('./routes/auth');
 const connectionsRouter = require('./routes/connections');
+const express = require('express');
+const userRoutes = require('./routes/user');
 
 const app = new Hono();
 
-// Middleware
-app.use('*', logger());
-app.use('*', prettyJSON());
+app.use('*', cors({
+  origin: ['http://localhost:3000', 'http://127.0.0.1:3000'],
+  allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowHeaders: ['Content-Type', 'Authorization'],
+  exposeHeaders: ['Content-Length', 'X-Kuma-Revision'],
+  maxAge: 600,
+  credentials: true,
+}));
 
-// Custom CORS middleware
+// Add logging middleware
 app.use('*', async (c, next) => {
-  const origin = c.req.header('Origin');
-  if (origin) {
-    c.header('Access-Control-Allow-Origin', origin);
-    c.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    c.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    c.header('Access-Control-Allow-Credentials', 'true');
-  }
-
-  if (c.req.method === 'OPTIONS') {
-    return c.text('', 200);
-  }
-
+  console.log('Request headers:', c.req.headers);
   await next();
+  console.log('Response headers:', c.res.headers);
 });
 
-// Authentication middleware
-app.use('*', async (c, next) => {
-  const authHeader = c.req.header('Authorization');
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    const accessToken = authHeader.split(' ')[1];
-    if (accessToken) {
-      const oauth2Client = new google.auth.OAuth2();
-      oauth2Client.setCredentials({ access_token: accessToken });
-      c.set('auth', oauth2Client);
-    }
-  }
-  await next();
+// Main API endpoint
+app.get('/', (c) => c.json({ message: '🚀 Backend is live!' }));
+
+// Health check endpoint
+app.get('/health', (c) => {
+  return c.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
 // Mount routers
 app.route('/api/auth', authRouter);
 app.route('/api', sheetsRouter);
 app.route('/api', slidesRouter);
-app.route('/api', connectionsRouter);
-
-// Health check route
-app.get('/health', (c) => c.json({ status: 'OK', timestamp: new Date().toISOString() }));
-
-// Catch-all route for debugging
-app.all('*', (c) => {
-  console.log('Received request:', c.req.method, c.req.path);
-  return c.text('Route not found', 404);
-});
-
-// Not found handler
-app.notFound((c) => {
-  return c.json({ error: 'Not Found', path: c.req.path }, 404);
-});
-
-// Error handler
-app.onError((err, c) => {
-  console.error('Server error:', err);
-  return c.json({ error: 'Internal Server Error', message: err.message }, 500);
-});
+app.route('/api/connections', connectionsRouter);
+app.use('/api/user', userRoutes);
 
 const port = process.env.PORT || 3001;
+
+// Start the server
 const server = serve({
   fetch: app.fetch,
   port: port
@@ -79,10 +52,12 @@ const server = serve({
 
 server.on('listening', () => {
   console.log(`🚀 Backend server is running on http://localhost:${port}`);
+  console.log('Try visiting http://localhost:3001 in your browser to see the "Backend is live" message');
 });
 
+// Error handling
 server.on('error', (err) => {
-  console.error('❌ Server error:', err);
+  console.error('Server error:', err);
 });
 
 process.on('SIGTERM', () => {
@@ -93,4 +68,5 @@ process.on('SIGTERM', () => {
   });
 });
 
+// Export the app for testing purposes
 module.exports = app;

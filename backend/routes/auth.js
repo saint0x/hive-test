@@ -33,6 +33,7 @@ authRouter.get('/check', async (c) => {
 });
 
 authRouter.get('/google/url', async (c) => {
+  console.log('Received request for Google auth URL');
   try {
     const authUrl = oauth2Client.generateAuthUrl({
       access_type: 'offline',

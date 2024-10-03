@@ -1,4 +1,4 @@
--const { OAuth2Client } = require('google-auth-library');
+const { OAuth2Client } = require('google-auth-library');
 
 const credentials = {
   client_id: '1027395944679-049n69bno5mi3127jco9vj1l4ingv34s.apps.googleusercontent.com',
@@ -18,5 +18,6 @@ function setCredentials(tokens) {
 
 module.exports = {
   oauth2Client,
-  setCredentials
+  setCredentials,
+  credentials
 };

@@ -3,13 +3,15 @@
 import { useState } from 'react';
 import { Button } from "@/components/ui/button"
 
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
+
 export default function GoogleAuthButton() {
   const [isLoading, setIsLoading] = useState(false);
 
   const handleGoogleLogin = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch('/api/auth/google/url');
+      const response = await fetch(`${BACKEND_URL}/api/auth/google/url`);
       const data = await response.json();
       if (data.url) {
         window.location.href = data.url;
